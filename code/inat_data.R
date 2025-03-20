@@ -1,5 +1,7 @@
 library(tidyverse)
+library(sf)
 
+#natuy_mdeo <- read_csv('/home/luis/Documents/GitHub/biases_naturalistauy_montevideo/data/observations-536732.csv')
 natuy_mdeo <- read_csv('data/observations-536732.csv')
 
 natuy_data_mdeo <- natuy_mdeo %>% 
@@ -8,6 +10,10 @@ natuy_data_mdeo <- natuy_mdeo %>%
   # filter records with obscured coordinates
   filter(coordinates_obscured == F)
 
-
 nrow(natuy_data_mdeo) # 10299 registros
 nrow(natuy_data_mdeo %>% distinct(taxon_species_name)) # 1387 especies
+
+### grilla hexagonal con id_hex como identificador
+#mvd_hex <- read_sf('/home/luis/Documents/GitHub/biases_naturalistauy_montevideo/data/hex/mvd_hex.shp')
+mvd_hex <- read_sf('data/hex/mvd_hex.shp')
+

@@ -49,7 +49,7 @@ natuy_mdeo <- read_csv('data/observations-536732.csv')
 #| message: false
 
 uruguay <- geodata::gadm(country = 'UY', level = 1, path = 'data/') %>% st_as_sf()
-montevideo <- uruguay %>% filter(NAME_1 == 'Montevideo')
+montevideo <- uruguay %>% filter(NAME_1 == 'Montevideo') %>% st_transform(32721)
 ```
 
 ## Explore the data
@@ -114,16 +114,38 @@ Each person loaded on average **`r round(mean_observations$mean_n_records,1)`** 
 #| message: false
 
 natuy_mdeo %>% 
-  group_by(iconic_taxon_name) %>% 
+  group_by(user_login) %>% 
   summarise(observations=n(), 
             species=n_distinct(taxon_species_name)) %>% 
   arrange(desc(observations)) %>% 
-  janitor::adorn_totals() %>% 
+  # janitor::adorn_totals() %>% 
+  mutate('#' = row_number()) %>% 
+  relocate('#') %>% 
+  slice_head(n = 10) %>% 
   kableExtra::kbl(format.args = list(decimal.mark = '.', 
                                      big.mark = ','),
                   digits=2,
                   booktabs = T) %>% 
   kableExtra::kable_styling(latex_options = c('striped', 'hold_position'))
+
+ggplotly(natuy_mdeo %>% 
+  group_by(user_login) %>% 
+  summarise(observations=n(), 
+            species=n_distinct(taxon_species_name)) %>% 
+  arrange(desc(observations)) %>% 
+  mutate(observations_q = case_when(observations <= 1 ~ '1',
+                                    observations <= 10 ~ '<10',
+                                    observations > 10 & observations <= 100 ~ '10 - 100',
+                                    observations > 100 & observations <= 500 ~ '100 - 500',
+                                    observations > 500 ~ '>500',
+                                    .default = NA)) %>% 
+  mutate(observations_q = factor(observations_q,
+                                 levels =c('1', '<10','10 - 100','100 - 500','>500'))) %>% 
+  ggplot(aes(x = observations_q, fill = observations_q)) + 
+  geom_histogram(stat='count', show.legend = F) + 
+  scale_fill_brewer(palette = 'Set1', direction = 1) +
+  labs(x = 'Number of records per user', y='Frequency') + 
+  ggpubr::theme_pubclean())
 ```
 
 ### Geographic
@@ -166,10 +188,28 @@ map_observations <- natuy_mdeo_sf %>%
     iconic_taxa == 'Protozoans' ~ 'Protozoarios',
     .default = NA)) 
 
+# tmap_mode('plot')
+# st_bbox(montevideo)
+# st_bbox(natuy_mdeo_sf)
+# 
+# bbox <- c(540566.6, 6126635.2, 591231.9, 6159806.5)
+
+# tm_shape(montevideo, bbox = bbox) +
+#   tm_borders(col='grey10', lwd=2, lty = 'dashed') +
+# tm_shape(natuy_mdeo_sf) +
+#   tm_dots('iconic_taxon_name', 
+#           fill.scale = tm_scale(values='brewer.set2'),
+#           fill_alpha = 0.7, size=0.75, tm_legend(title='', orientation = 'landscape'),
+#           popup.vars=c('ID observación'='id',
+#                        'Taxón'='scientific_name',
+#                        'Grupo' ='iconic_taxon_name',
+#                        'Usuario'='user_login',
+#                        'Fecha de observación'='observed_on')) + tmap_options(component.autoscale = FALSE)
+
 tm_shape(montevideo) +
   tm_borders(col='grey10', lwd=2, lty = 'dashed') +
 tm_shape(natuy_mdeo_sf) +
-  tm_dots('iconic_taxon_name', 
+  tm_dots('iconic_taxon_name',
           fill.scale = tm_scale(values='brewer.set2'),
           fill_alpha = 0.7, size=0.75, tm_legend(title=''),
           popup.vars=c('ID observación'='id',

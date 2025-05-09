@@ -39,3 +39,18 @@ ggplot(mvd_hex)+
   theme_void()+
   annotation_scale(location = "bl", width_hint = 0.2)
 
+head(natuy_mdeo)
+hist(table(natuy_mdeo$user_login ), breaks=100)
+
+hist(month(natuy_mdeo$observed_on))
+
+table(natuy_mdeo$time_zone)
+
+hist(hour(na.omit((natuy_mdeo$time_observed_at))) )
+
+time<- natuy_mdeo %>% mutate(mes=month(observed_on),
+                      hora=hour(time_observed_at) ) %>% 
+        select(mes,hora)
+
+ggplot(time)+
+  geom_boxplot(aes(x=factor(mes), y=hora), outlier.shape=NA )

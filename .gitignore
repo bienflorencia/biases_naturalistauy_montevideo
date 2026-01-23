@@ -7,5 +7,5 @@
 .DS_Store
 
 **/*.quarto_ipynb
-/code/draft_
-/data/draft_
+code/_draft/*
+data/_draft/*

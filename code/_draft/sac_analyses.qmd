@@ -1,0 +1,394 @@
+---
+title: 'SAC'
+format: 
+  html:
+    toc: true
+    toc-location: right
+    smooth-scroll: true
+    html-math-method: katex
+    code-fold: true
+self-contained: true
+editor: source
+author: 'Florencia Grattarola'
+date: '`r format(Sys.time(), "%Y-%m-%d")`'
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#| label: libraries
+#| warning: false
+#| message: false
+
+library(vegan)
+library(spaa)
+library(patchwork)
+library(janitor)
+library(tmap)
+tmap_mode('view')
+library(sf)
+sf_use_s2(FALSE)
+library(tidyverse)
+```
+
+## Load iNat data
+
+```{r}
+#| label: inat-data
+#| warning: false
+#| message: false
+
+natuy_mdeo <- read_csv('data/observations-536732.csv')
+
+natuy_mdeo_sf <- natuy_mdeo %>% 
+    st_as_sf(coords = c("longitude", "latitude")) %>% 
+    st_set_crs(4326) %>% 
+    st_transform(32721)
+```
+
+## Load basemap data
+
+```{r}
+#| label: geo-data
+#| warning: false
+#| message: false
+
+uruguay <- geodata::gadm(country = 'UY', 
+                         level = 1, path = 'data/') %>%
+  st_as_sf()
+
+montevideo <- uruguay %>% 
+  filter(NAME_1 == 'Montevideo') %>% 
+  st_transform(32721)
+```
+
+## Create Montevideo grid cells
+
+Size of the grid cells: 1x1 km
+
+```{r}
+#| label: grids
+#| echo: true
+#| eval: true
+#| message: false
+#| warning: false
+#| code-fold: false
+
+montevideo_grids <- st_make_grid(st_union(montevideo), 
+                                 1000, square = F) %>%
+  st_intersection(st_union(montevideo)) %>% 
+  st_sf(gridID=1:length(.), geometry= .) %>% 
+  st_make_valid() %>% st_cast() 
+```
+
+```{r}
+#| label: save-grids
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+#| code-fold: false
+
+saveRDS(montevideo_grids, 'data/montevideo_grids.rds')
+```
+
+## iNat metrics per grid cell
+
+Metrics:
+
+  - `NR`: number of records.  
+  - `TR`: number of taxa (taxa richness).  
+  - `SR`: number of species (species richness).  
+  - `spsList`: list of species per grid cell.  
+
+```{r}
+#| label: grid-metrics
+#| echo: true
+#| eval: true
+#| message: false
+#| warning: false
+#| code-fold: false
+
+grids_iNat_metrics <- st_join(montevideo_grids,
+                              natuy_mdeo_sf) %>% 
+  group_by(gridID) %>% 
+  summarise(NR=ifelse(n_distinct(scientific_name, na.rm=T)!=0, n(), 0),
+            TR=n_distinct(scientific_name, na.rm = T),
+            SR=n_distinct(taxon_species_name, na.rm = T),
+            spsList = ifelse(NR==0, NA, paste(na.omit(taxon_species_name), collapse = ';'))) %>% 
+  st_cast()
+```
+
+
+```{r}
+#| label: save-grids
+#| echo: false
+#| eval: true
+#| message: false
+#| warning: false
+#| code-fold: false
+
+saveRDS(grids_iNat_metrics, 'data/montevideo_grids_iNat.rds')
+```
+
+### Plots
+
+```{r}
+#| label: plot-metrics
+#| echo: true
+#| eval: true
+#| message: false
+#| warning: false
+#| code-fold: true
+#| fig-dpi: 50
+#| out-width: '100%'
+#| fig-cap: 
+#|  - 'Number of iNaturalist records per grid cell'
+#|  - 'Number of species per grid cell'
+
+tmap_mode('plot')
+# tmap_mode('view')
+
+plot_NR <- tm_shape(uruguay, bbox = montevideo) +
+  tm_polygons(fill='grey95', col='grey10', lwd=1) +
+tm_shape(montevideo) +
+  tm_borders(col='grey10', lwd=2, lty = 'dashed') +
+tm_shape(grids_iNat_metrics %>% 
+           select(-spsList) %>% 
+           mutate(NR=ifelse(NR==0, NA, NR))) +
+  tm_polygons(fill = 'NR', col='grey40', col_alpha = 0.2,
+              fill.scale = tm_scale_intervals(n = 6, 
+                                              style = 'jenks', 
+                                              # breaks = c(1,5,10,20,100,979),
+                                              values = 'brewer.yl_gn_bu',
+                                              value.na = 'grey80',
+                                              label.na = '0'),
+              fill_alpha = 0.8,
+              fill.legend = tm_legend(item.space = 0, item.na.space = 0,
+                                      title = 'Number of records', 
+                                      reverse=T, 
+                                      # frame=F, 
+                                      frame.lwd = 0.1,
+                                      bg.color = 'white')) +
+  tm_layout(legend.outside = F, 
+            # legend.position = c('right','top'), 
+            frame=F)
+
+plot_NR
+
+
+plot_SR <- tm_shape(uruguay, bbox = montevideo) +
+  tm_polygons(fill='grey95', col='grey10', lwd=1) +
+tm_shape(montevideo) +
+  tm_borders(col='grey10', lwd=2, lty = 'dashed') +
+tm_shape(grids_iNat_metrics %>% 
+           select(-spsList) %>% 
+           mutate(SR=ifelse(SR==0, NA, SR))) +
+  tm_polygons(fill = 'SR', col='grey40', col_alpha = 0.2,
+              fill.scale = tm_scale_intervals(n = 6, 
+                                              style = 'jenks', 
+                                              # breaks = c(1,5,10,20,100,979),
+                                              values = 'brewer.rd_pu',
+                                              value.na = 'grey80',
+                                              label.na = '0'),
+              fill_alpha = 0.8,
+              fill.legend = tm_legend(item.space = 0, item.na.space = 0,
+                                      title = 'Species richness', 
+                                      reverse=T, 
+                                      # frame=F, 
+                                      frame.lwd = 0.1,
+                                      bg.color = 'white')) +
+  tm_layout(legend.outside = F, 
+            # legend.position = c('right','top'),  
+            frame=F)
+
+plot_SR
+```
+
+
+## Estimation of sampling effort per grid cell
+
+We used the function `get_gridsSlopes()` created by Biodiversidata ([Grattarola et al. 2020](https://doi.org/10.1038/s41598-020-79074-8)). 
+
+::: {.callout-note collapse="true"}
+## More info about this analysis
+
+The code is available at the GitHub repo: [Multiple forms of hotspots of tetrapod biodiversity and the challenges of open-access data scarcity](https://github.com/bienflorencia/Multiple-forms-of-hotspots-of-tetrapod-biodiversity/blob/22bf5de985ba25267efa64fd308574547437e566/R/04_identification_of_areas_of_ignorance.R).
+
+> To identify the areas of ignorance we quantified the levels of inventory incompleteness for each group by using curvilinearity of smoothed species accumulation curves (SACs). This method assumes that SACs of poorly sampled grids tend towards a straight line, while those of better sampled ones have a higher degree of curvature. As a proxy for inventory incompleteness we calculated the degree of curvilinearity as the mean slope of the last 10% of SACs.
+
+:::
+
+
+```{r}
+#| label: slope-sac-function
+#| echo: true
+#| eval: true
+#| message: false
+#| warning: false
+
+# The function ```get_gridsSlopes``` finds a species accumulation curve (SAC) for each grid-cell using the method 'exact' of the function ```specaccum``` of the vegan package and then calculates the degree of curvilinearity as the mean slope of the last 10% of the curve. 
+
+get_gridsSlopes <- function(data_abundance){
+  
+  data_abundance <- data_abundance %>% 
+    mutate(abundance = 1L) %>% 
+    as.data.frame() 
+  
+  grids_slope <- tibble(gridID=integer(), slope=numeric())
+  
+  splistT <- list()
+  spaccum <- list()
+  slope <- list()
+  
+  for (i in unique(data_abundance$gridID)) {
+    splist <- data_abundance[data_abundance$gridID == i,c(2:4)]
+    splistT[[i]] = data2mat(splist) #  plotname species abundance
+    spaccum[[i]] = specaccum(splistT[[i]], method = "exact")
+    slope[[i]] = (spaccum[[i]][[4]][length(spaccum[[i]][[4]])]-
+                    spaccum[[i]][[4]][ceiling(length(spaccum[[i]][[4]])*0.9)])/
+      (length(spaccum[[i]][[4]])- ceiling(length(spaccum[[i]][[4]])*0.9))
+    
+    grids_slope_i <- tibble(gridID=i, slope=slope[[i]])
+    grids_slope <- rbind(grids_slope, grids_slope_i) 
+  }
+  
+  grids_slope <- grids_slope %>%  
+    mutate(slope=ifelse(is.nan(slope), NA, slope))
+  
+  return(grids_slope)
+}
+```
+
+
+```{r}
+#| label: slope-sac-calculation
+#| echo: true
+#| eval: true
+#| message: false
+#| warning: false
+
+species_list_per_grid <- grids_iNat_metrics %>% as_tibble() %>% 
+  mutate(species=str_split(spsList, ';')) %>% 
+  unnest(species) %>% 
+  group_by(spsList) %>% mutate(sample = row_number()) %>% 
+  ungroup() %>% 
+  mutate(sample=ifelse(is.na(species), 0 , sample)) %>% 
+  select(gridID, sample, species)
+
+montevideo_SAC_slopes <- get_gridsSlopes(species_list_per_grid)
+
+montevideo_grids_SAC <- left_join(montevideo_grids,
+                                  montevideo_SAC_slopes)
+
+```
+
+### Plot
+
+```{r}
+#| label: plot-sac
+#| echo: true
+#| eval: true
+#| message: false
+#| warning: false
+#| code-fold: true
+#| fig-dpi: 50
+#| out-width: '100%'
+#| fig-cap: 
+#|  - 'Incompleteness'
+
+
+plot_SAC <- tm_shape(uruguay, bbox = montevideo) +
+  tm_polygons(fill='grey95', col='grey10', lwd=1) +
+tm_shape(montevideo) +
+  tm_borders(col='grey10', lwd=2, lty = 'dashed') +
+tm_shape(montevideo_grids_SAC %>% 
+           mutate(slope=ifelse(slope==0, NA, slope))) +
+  tm_polygons(fill = 'slope', col='grey40', col_alpha = 0.2,
+              fill.scale = tm_scale_intervals(n = 6, 
+                                              # style = 'jenks', 
+                                              breaks = c(0,0.15,0.25,0.5,0.75,1),
+                                              values = 'brewer.or_rd',
+                                              value.na = 'grey80',
+                                              label.na = 'Undersampled'),
+              fill_alpha = 0.8, 
+              fill.legend = tm_legend(item.space = 0, item.na.space = 0,
+                                      title = 'Incompleteness', 
+                                      reverse=T, 
+                                      frame.lwd = 0.1,
+                                      bg.color = 'white')) +
+  tm_layout(legend.outside = F, 
+            # legend.position = c('right','top'), 
+            frame=F)
+
+plot_SAC
+```
+
+
+
+
+```{r}
+
+variables <- st_intersection(montevideo_grids, 
+                census %>% 
+                  select(population=P_TOT/AREA, 
+                         education=E_F_P_21/AREA, 
+                         house_density=V_TOT/AREA, 
+                         vacant_house_density=V_TOT_DES/AREA, 
+                         unsatisfied_basic_needs=NBI_Si/AREA)) %>%
+  st_cast %>% 
+  group_by(gridID) %>% 
+  summarise(population = sum(population),
+            education = sum(education),
+            house_density = sum(house_density),
+            vacant_house_density = sum(vacant_house_density),
+            unsatisfied_basic_needs = sum(unsatisfied_basic_needs))
+
+tm_shape(uruguay, bbox = montevideo) +
+    tm_polygons(fill='grey95', col='grey10', lwd=1) +
+    tm_shape(montevideo) +
+    tm_borders(col='grey10', lwd=2, lty = 'dashed') +
+    tm_shape(variables %>% 
+                 mutate(population=ifelse(population==0, NA, population))) +
+    tm_polygons(fill = 'unsatisfied_basic_needs', col='grey40', col_alpha = 0.2,
+                fill.scale = tm_scale_intervals(n = 6, 
+                                                style = 'jenks', 
+                                                #breaks = c(0,0.15,0.25,0.5,0.75,1),
+                                                values = 'brewer.gn_bu',
+                                                value.na = 'grey80',
+                                                label.na = '0'),
+                fill_alpha = 0.8, 
+                fill.legend = tm_legend(item.space = 0, item.na.space = 0,
+                                        #title = 'unsatisfied_basic_needs', 
+                                        reverse=T, 
+                                        frame.lwd = 0.1,
+                                        bg.color = 'white')) +
+    tm_layout(legend.outside = F, 
+              # legend.position = c('right','top'), 
+              frame=F)
+
+
+
+tm_shape(uruguay, bbox = montevideo) +
+    tm_polygons(fill='grey95', col='grey10', lwd=1) +
+    tm_shape(montevideo) +
+    tm_borders(col='grey10', lwd=2, lty = 'dashed') +
+    tm_shape(census) +
+    tm_polygons(fill = 'P_TOT', col='grey40', col_alpha = 0.2,
+                fill.scale = tm_scale_intervals(n = 6, 
+                                                style = 'jenks', 
+                                                #breaks = c(0,0.15,0.25,0.5,0.75,1),
+                                                values = 'brewer.gn_bu',
+                                                value.na = 'grey80',
+                                                label.na = '0'),
+                fill_alpha = 0.8, 
+                fill.legend = tm_legend(item.space = 0, item.na.space = 0,
+                                        #title = 'unsatisfied_basic_needs', 
+                                        reverse=T, 
+                                        frame.lwd = 0.1,
+                                        bg.color = 'white')) +
+    tm_layout(legend.outside = F, 
+              # legend.position = c('right','top'), 
+              frame=F)
+
+```

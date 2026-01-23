@@ -8,14 +8,14 @@ This repository ([https://github.com/bienflorencia/biases_naturalistauy_montevid
 ## **Code**
 
   - `code/analyses.qmd`: a Quarto file with the code used to download the data, run the models, and produce figures.  
-  - `code/analyses.html`: an HTML file with the code used to download the data, run the models, and produce figures.
+  - `code/analyses.html`: an HTML file with the code used to download the data, run the models, and produce figures. See a live preview [here](code/analyses.html).
 
 ## **Data**
 
-  - `observations-536732`: an csv file containing the observations downloaded from iNaturalist.   
+  - `observations-536732.csv`: an csv file containing the observations downloaded from iNaturalist.   
   - `montevideo_data.gpkg`: a geopackage file containing 3 layers for the Montevideo department; `grid`: the grid of 1,148 cells of 0.5 km² area, `env` the grid with environmental variables, and `social` the grid with social variables.  
   
-Variables in the `montevideo_data.gpkg`: 
+### Variables in the `montevideo_data.gpkg`: 
   
   - `id_hex`: identifier for the grid cell.     
   - `ndvi`: median normalized differences vegetation index.   

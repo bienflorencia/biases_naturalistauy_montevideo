@@ -13,9 +13,9 @@ This repository ([https://github.com/bienflorencia/biases_naturalistauy_montevid
 ## **Data**
 
   - `observations-536732`: an csv file containing the observations downloaded from iNaturalist.   
-  - `montevideo_data.gpkg`: an geopackage file containing 3 layers for Montevideo deparment: `grid` the grid cell, `env` , and `social` the .  
+  - `montevideo_data.gpkg`: a geopackage file containing 3 layers for the Montevideo department; `grid`: the grid of 1,148 cells of 0.5 km² area, `env` the grid with environmental variables, and `social` the grid with social variables.  
   
-Variables in the  `montevideo_data.gpkg`: 
+Variables in the `montevideo_data.gpkg`: 
   
   - `id_hex`: identifier for the grid cell.     
   - `ndvi`: median normalized differences vegetation index.   

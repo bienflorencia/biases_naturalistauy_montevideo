@@ -5,3 +5,7 @@
 
 /.quarto/
 .DS_Store
+
+**/*.quarto_ipynb
+/code/draft_
+/data/draft_

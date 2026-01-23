@@ -7,21 +7,30 @@ This repository ([https://github.com/bienflorencia/biases_naturalistauy_montevid
 
 ## **Code**
 
-  - `code/data_download_and_summary.qmd`: a Quarto file with the code used to download the data, generate summaries, and produce figures.  
-  - `code/data_download_and_summary.html`: an HTML file with the code used to download the data, generate summaries, and produce figures.
-  - `code/XXXXXX.R`: an R file with the code used to run the models, and generate the plots and maps.  
+  - `code/analyses.qmd`: a Quarto file with the code used to download the data, run the models, and produce figures.  
+  - `code/analyses.html`: an HTML file with the code used to download the data, run the models, and produce figures.
 
 ## **Data**
 
-  - `xxx.rds`: an RDS file containing xxx.  
-
-Variables in the files: 
-  - `xxx`: column definition
+  - `observations-536732`: an csv file containing the observations downloaded from iNaturalist.   
+  - `montevideo_data.gpkg`: an geopackage file containing 3 layers for Montevideo deparment: `grid` the grid cell, `env` , and `social` the .  
   
-
-## **Figures**
-
-  - `xxx.png`: a PNG figure with ...
+Variables in the  `montevideo_data.gpkg`: 
+  
+  - `id_hex`: identifier for the grid cell.     
+  - `ndvi`: median normalized differences vegetation index.   
+  - `ndmi`: median normalized differences moisture index.   
+  - `pndbi`: built-up proportion (based on normalized differences built-up index).  
+  - `protection`: proportion of protected area in the grid cell.    
+  - `lcz`: local climate zones (urban landscape categories).  
+  - `dist_coast`: distance from the centroid of the grid cell to the coastline (in meters).    
+  - `alan`: median artificial light at night, measured as radiance (nW cm⁻² sr⁻¹).   
+  - `pop`: number of people.  
+  - `houses`: total number of houses in the grid cell.    
+  - `education`: median adult (>21years) education in years in the grid cell.     
+  - `N`: number of iNaturalist observations in the grid cell.     
+  - `S`: species richness of iNaturalist observations per grid cell.       
+  - `pres`: presence or absence of an iNaturalist observation in the grid cell (binary).    
 
 ## LICENCE
 

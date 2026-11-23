@@ -9,3 +9,4 @@
 **/*.quarto_ipynb
 code/_draft/*
 data/_draft/*
+data/_raw/*

@@ -1,0 +1,32 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  Socio-ecological drivers of urban biodiversity patterns in
+  contributory science data
+message: 'If you use this software, please cite our publication'
+type: software
+authors:
+  - given-names: Luis
+    family-names: Orlando
+    affiliation: >-
+      Instituto de Investigaciones Biológicas Clemente
+      Estable
+  - given-names: Mauro
+    family-names: Berazategui
+    affiliation: >-
+      Centro Universitario Regional Este, Universidad de la
+      República
+  - given-names: Florencia
+    family-names: Grattarola
+    affiliation: Czech University of Life Sciences Prague
+    orcid: 'https://orcid.org/0000-0001-8282-5732'
+repository-code: >-
+  https://github.com/bienflorencia/biases_naturalistauy_montevideo
+keywords:
+  - citizen-science
+  - iNaturalist
+  - urban ecology
+license: GPL-3.0
+date-released: '2026-11-23'

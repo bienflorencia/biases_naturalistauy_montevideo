@@ -28,6 +28,7 @@ editor_options:
 #| warning: false
 #| message: false
 
+library(Hmisc)
 library(GGally)
 library(lme4)
 library(effects)
@@ -42,6 +43,9 @@ library(janitor)
 library(plotly)
 library(lubridate)
 library(tmap)
+library(glmmTMB)
+library(ggeffects)
+library(performance)
 tmap_mode('view')
 library(sf)
 sf_use_s2(FALSE)
@@ -178,16 +182,9 @@ map_observations <- inat_mdeo_sf %>%
   filter(positional_accuracy <= 500)
 
 tm_shape(montevideo) +
-  tm_borders(col='grey10', lwd=2, lty = 'dashed') +
-tm_shape(inat_mdeo_sf) +
-  tm_dots('iconic_taxon_name',
-          fill.scale = tm_scale(values='brewer.set2'),
-          fill_alpha = 0.7, size=0.75, tm_legend(title=''),
-          popup.vars=c('ID observación'='id',
-                       'Taxón'='scientific_name',
-                       'Grupo' ='iconic_taxon_name',
-                       'Usuario'='user_login',
-                       'Fecha de observación'='observed_on')) +
+  tm_borders(col='grey50', lwd=1) +
+  tm_shape(inat_mdeo_sf) +
+  tm_dots(size = 0.25) +
   tm_layout(legend.show = F)
 ```
 
@@ -377,7 +374,7 @@ inat_mdeo_sf <- st_as_sf(inat_mdeo,
 # join the grid to the points and count records and species
 mvd_inat <- st_join(mvd_grid, inat_mdeo_sf) %>% 
   group_by(id_hex) %>%
-  summarise(N = sum(!is.na(taxon_species_name)),
+  summarise(N = sum(!is.na(id)),
     S = n_distinct(taxon_species_name, na.rm = TRUE)) 
 ```
 
@@ -387,55 +384,56 @@ mvd_inat <- st_join(mvd_grid, inat_mdeo_sf) %>%
 #| message: false
 #| code-fold: true
 
-tm_shape(mvd_inat %>%
-           mutate(N=ifelse(N == 0, NA, N))) +
-  tm_polygons('N', col_alpha = 0.5,
-              # fill_alpha = 0.7
-              fill.scale = tm_scale_continuous(
-                values = 'brewer.blues',
-                value.na = 'grey40', label.na = '0'),
-              fill.legend = tm_legend(frame=F,
-                                      title = 'Number of records',
-                                      reverse = T,
-                                      position= tm_pos_out())) +
-  tm_shape(montevideo) +
-  tm_borders(col='grey10', col_alpha = 0.5) +
-  tm_layout(frame=F)+
-  tm_scalebar(position = tm_pos_out('center', 'bottom'),
-              breaks = c(0,5,10))
+# tm_shape(mvd_inat %>%
+#            mutate(N=ifelse(N == 0, NA, N))) +
+#   tm_polygons('N', col_alpha = 0.5,
+#               # fill_alpha = 0.7
+#               fill.scale = tm_scale_continuous(
+#                 values = 'brewer.blues',
+#                 value.na = 'grey40', label.na = '0'),
+#               fill.legend = tm_legend(frame=F,
+#                                       title = 'Number of records',
+#                                       reverse = T,
+#                                       position= tm_pos_out())) +
+#   tm_shape(montevideo) +
+#   tm_borders(col='grey10', col_alpha = 0.5) +
+#   tm_layout(frame=F)+
+#   tm_scalebar(position = tm_pos_out('center', 'bottom'),
+#               breaks = c(0,5,10))
 
-# ggplot(mvd_inat %>%             
-#          mutate(N=ifelse(N == 0, NA, N)))+
-#   geom_sf(aes(fill=N))+
-#   scale_fill_gradient(low= "yellow", 
-#                       high="red",
-#                       na.value = 'grey40')+
-#   geom_sf(data = montevideo) +
-#   labs(fill="Number of records")+
-#   theme_void()+
-#   ggspatial::annotation_scale(location = "bl", width_hint = 0.2)
+ggplot(mvd_inat)+
+  geom_sf(aes(fill=N))+
+  scale_fill_gradientn(
+  colours = c("grey70", "yellow",
+              colorRampPalette(c("orange","red", "darkred"))(5)),
+  values = scales::rescale(c(0, 1)) )+
+  theme_void()+
+  ggspatial::annotation_scale(location = "bl", 
+                              width_hint = 0.2)+
+  theme(legend.position="top", 
+        legend.direction = "horizontal")
 
-tm_shape(mvd_inat %>%
-           mutate(S=ifelse(S == 0, NA, S))) +
-  tm_polygons('S', col_alpha = 0.5,
-              # fill_alpha = 0.7
-              fill.scale = tm_scale_continuous(
-                values = 'brewer.reds',
-                value.na = 'grey40', label.na = '0'),
-              fill.legend = tm_legend(frame=F,
-                                      reverse = T,
-                                      title = 'Number of species',
-                                      position= tm_pos_out())) +
-  tm_shape(montevideo) +
-  tm_borders(col='grey10', col_alpha = 0.5) +
-  tm_layout(frame=F)+
-  tm_scalebar(position = tm_pos_out('center', 'bottom'),
-              breaks = c(0,5,10))
+# tm_shape(mvd_inat %>%
+#            mutate(S=ifelse(S == 0, NA, S))) +
+#   tm_polygons('S', col_alpha = 0.5,
+#               # fill_alpha = 0.7
+#               fill.scale = tm_scale_continuous(
+#                 values = 'brewer.reds',
+#                 value.na = 'grey40', label.na = '0'),
+#               fill.legend = tm_legend(frame=F,
+#                                       reverse = T,
+#                                       title = 'Number of species',
+#                                       position= tm_pos_out())) +
+#   tm_shape(montevideo) +
+#   tm_borders(col='grey10', col_alpha = 0.5) +
+#   tm_layout(frame=F)+
+#   tm_scalebar(position = tm_pos_out('center', 'bottom'),
+#               breaks = c(0,5,10))
 
-# ggplot(mvd_inat %>%             
+# ggplot(mvd_inat %>%
 #          mutate(S=ifelse(S == 0, NA, S)))+
 #   geom_sf(aes(fill=S))+
-#   scale_fill_gradient(low= "yellow", 
+#   scale_fill_gradient(low= "yellow",
 #                       high="blue",
 #                       na.value = 'grey40')+
 #   geom_sf(data = montevideo) +
@@ -485,56 +483,56 @@ mvd_social <- st_read(dsn = 'data/montevideo_data.gpkg',
 #| message: false
 #| code-fold: true
 
-# ggplot(mvd_env)+
-#   geom_sf(aes(fill=ndvi))+
-#   scale_fill_gradient(low= "white", high="darkgreen")+
-#   geom_sf(data = montevideo) +
-#   labs(fill="NDVI")+
-#   theme_void()+
-#   ggspatial::annotation_scale(location = "bl", width_hint = 0.2)
+ggplot(mvd_env)+
+  geom_sf(aes(fill=ndvi))+
+  scale_fill_gradient(low= "white", high="darkgreen")+
+  geom_sf(data = montevideo) +
+  labs(fill="NDVI")+
+  theme_void()+
+  ggspatial::annotation_scale(location = "bl", width_hint = 0.2)
 
-tm_shape(mvd_env) +
-  tm_polygons('ndvi', col_alpha = 0.5,
-              # fill_alpha = 0.7
-              fill.scale = tm_scale_continuous(
-                values = 'brewer.greens',
-                limits = c(-0.3, 0.75)),
-              fill.legend = tm_legend(
-                frame=F, reverse = T,
-                title = 'NDVI',
-                #orientation = 'landscape',
-                position= tm_pos_out())) +
-  tm_shape(montevideo) +
-  tm_borders(col='grey10', col_alpha = 0.5) +
-  tm_layout(frame=F)+
-  tm_scalebar(position = tm_pos_out('center', 'bottom'),
-              breaks = c(0,5,10))
+# tm_shape(mvd_env) +
+#   tm_polygons('ndvi', col_alpha = 0.5,
+#               # fill_alpha = 0.7
+#               fill.scale = tm_scale_continuous(
+#                 values = 'brewer.greens',
+#                 limits = c(-0.3, 0.75)),
+#               fill.legend = tm_legend(
+#                 frame=F, reverse = T,
+#                 title = 'NDVI',
+#                 #orientation = 'landscape',
+#                 position= tm_pos_out())) +
+#   tm_shape(montevideo) +
+#   tm_borders(col='grey10', col_alpha = 0.5) +
+#   tm_layout(frame=F)+
+#   tm_scalebar(position = tm_pos_out('center', 'bottom'),
+#               breaks = c(0,5,10))
 
+ggplot(mvd_social)+
+  geom_sf(aes(fill=education))+
+  scale_fill_gradient(low= "white", high="black")+
+  geom_sf(data = montevideo) +
+  labs(fill="Education(yr.)")+
+  theme_void()+
+  ggspatial::annotation_scale(location = "bl", width_hint = 0.2)
 
-# ggplot(mvd_social)+
-#   geom_sf(aes(fill=education))+
-#   scale_fill_gradient(low= "white", high="black")+
-#   geom_sf(data = montevideo) +
-#   labs(fill="Education(yr.)")+
-#   theme_void()+
-#   ggspatial::annotation_scale(location = "bl", width_hint = 0.2)
+# tm_shape(mvd_social) +
+#   tm_polygons('education', col_alpha = 0.5,
+#               # fill_alpha = 0.7
+#               fill.scale = tm_scale_continuous(
+#                 values = 'brewer.greys',
+#                 limits = c(0, 15)),
+#               fill.legend = tm_legend(
+#                 frame=F, reverse = T,
+#                 title = 'Education (yr.)',
+#                 #orientation = 'landscape',
+#                 position= tm_pos_out())) +
+#   tm_shape(montevideo) +
+#   tm_borders(col='grey10', col_alpha = 0.5) +
+#   tm_layout(frame=F)+
+#   tm_scalebar(position = tm_pos_out('center', 'bottom'),
+#               breaks = c(0,5,10))
 
-tm_shape(mvd_social) +
-  tm_polygons('education', col_alpha = 0.5,
-              # fill_alpha = 0.7
-              fill.scale = tm_scale_continuous(
-                values = 'brewer.greys',
-                limits = c(0, 15)),
-              fill.legend = tm_legend(
-                frame=F, reverse = T,
-                title = 'Education (yr.)',
-                #orientation = 'landscape',
-                position= tm_pos_out())) +
-  tm_shape(montevideo) +
-  tm_borders(col='grey10', col_alpha = 0.5) +
-  tm_layout(frame=F)+
-  tm_scalebar(position = tm_pos_out('center', 'bottom'),
-              breaks = c(0,5,10))
 ```
 
 ## Models
@@ -559,6 +557,90 @@ mvd_hex <- st_join(st_join(mvd_env,
   relocate('pres', .after = 'S')
 ```
 
+
+### Are records zero-inflated?
+
+```{r}
+#| label: zero-inflated
+#| warning: false
+#| message: false
+
+sum(mvd_hex$N == 0)/nrow(mvd_hex)
+
+ggplot(mvd_hex) +
+  geom_sf(aes(fill=factor(pres)))+
+  scale_fill_manual(values=c("white","black"))+
+  theme_void()+ labs(fill='pres')+
+  ggspatial::annotation_scale(location = "bl", width_hint = 0.2)
+```
+
+### Correlations
+
+```{r}
+#| label: correlation-funs
+#| warning: false
+#| message: false
+
+stars <- function(p) {
+  as.character(cut(p, c(-Inf, .001, .01, .05, Inf),
+                   labels = c("***", "**", "*", "")))
+}
+
+cor_table <- function(data) {
+  res <- data %>%
+    st_drop_geometry() %>%
+    select(ndvi, ndmi, pndbi, alan, dist_coast, 
+           protection, education, pop, houses) %>%
+    as.matrix() %>%
+    rcorr(type = "pearson")
+
+  as.data.frame(as.table(res$r)) %>%
+    rename(var1 = Var1, var2 = Var2, r = Freq) %>%
+    mutate(p = as.vector(res$P)) %>%
+    filter(as.integer(var1) > as.integer(var2)) %>%
+    mutate(significance     = stars(p),
+           p_adjusted       = p.adjust(p, method = "BH"),
+           significance_adj = stars(p_adjusted))
+}
+
+cor_heatmap <- function(cor_df) {
+  ggplot(cor_df, aes(var2, var1, fill = r)) +
+    geom_tile(color = "white", linewidth = 0.5) +
+    geom_text(aes(label = paste0(sprintf("%.2f", r), significance)), size = 2.5) +
+    scale_fill_gradient2(low = "#2166AC", 
+                         mid = "white", 
+                         high = "#B2182B",
+                         midpoint = 0, 
+                         limits = c(-1, 1), 
+                         name = "Pearson's r") +
+    coord_fixed() +
+    labs(x = NULL, y = NULL) +
+    theme_minimal() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 45, 
+                                     hjust = 1, vjust = 1))
+}
+```
+
+```{r}
+#| label: correlations
+#| warning: false
+#| message: false
+
+#### All hexagons ####
+cor_all <- cor_table(mvd_hex)
+filter(cor_all, abs(r) > 0.7)
+cor_heatmap(cor_all)
+
+#### Number of Obs: N > 0 only ####
+positive <- filter(mvd_hex, N > 0)
+hist(positive$N, breaks = 1000, xlim = c(0, 40))
+
+cor_pos <- cor_table(positive)
+filter(cor_pos, abs(r) > 0.7)
+cor_heatmap(cor_pos)
+```
+
 ### GAM observation occurrence
 
 ```{r}
@@ -566,57 +648,73 @@ mvd_hex <- st_join(st_join(mvd_env,
 #| warning: false
 #| message: false
 
-fit_bin1 <- gam(pres ~ s(ndvi) + s(ndmi) + 
-                 s(pndbi) + lcz + 
-                 s(alan) + s(dist_coast) +
-                 s(protection) + s(pop) + 
-                 s(houses) + s(education),
-               family = binomial, data = mvd_hex)
+# null model
+fit_bin_null <- gam(pres ~ 1, 
+                    family = binomial, data = mvd_hex,
+                    select=T)
 
-summary(fit_bin1)
+# other models
 
-# remove: lcz
-fit_bin2 <- gam(pres ~ s(ndvi) + s(ndmi)+ 
-                  s(pndbi) + s(alan) +
-                  s(dist_coast) +s(protection) +s(pop) +
-                 s(houses) +s(education), 
-                family = binomial, data = mvd_hex)
+m_ndvi_ndmi_hou <- gam(pres ~ s(ndvi, k=6) +  
+                         s(ndmi, k=6) + 
+                         s(houses, k=6)+
+                         s(dist_coast, k=6) + 
+                         s(protection, k=6) +
+                         s(education, k=6),
+                       family = binomial(link = "logit"),
+                       data = mvd_hex, method = "REML",
+                       select = TRUE)
 
-summary(fit_bin2)
+m_ndvi_ndmi <- gam(pres ~ s(ndvi, k=6) +  
+                     s(ndmi, k=6) +
+                     s(dist_coast, k=6) + 
+                     s(protection, k=6) +
+                     s(education, k=6),
+                   family = binomial(link = "logit"),
+                   data = mvd_hex, method = "REML",
+                   select = TRUE)
 
-# remove: -pnbi -lcz
-fit_bin3 <- gam(pres ~ s(ndvi) + s(ndmi)+ 
-                  s(alan) +s(dist_coast) +
-                  s(protection) +s(pop) +
-                  s(houses) +s(education), 
-                family = binomial, data = mvd_hex)
+m_ndmi_pop <- gam(pres ~ s(ndmi, k=6) + 
+                    s(pop, k=6) + 
+                    s(dist_coast, k=6) + 
+                    s(protection, k=6) +  
+                    s(education, k=6),
+                  family = binomial(link = "logit"),
+                  data = mvd_hex, method = "REML",
+                  select = TRUE)
 
+m_ndmi_hou <- gam(pres ~ s(ndmi, k=6) + 
+                    s(houses, k=6) +
+                    s(dist_coast, k=6) + 
+                    s(protection, k=6) + 
+                    s(education, k=6),
+        family = binomial(link = "logit"), 
+        data = mvd_hex, method = "REML",
+        select = TRUE)
 
-summary(fit_bin3)
+m_ndmi_alan <- gam(pres ~ s(ndmi, k=10) + 
+                     s(alan, k=10) +
+                     s(dist_coast, k=10) + 
+                     s(protection, k=10) + 
+                     s(education, k=10),
+        family = binomial(link = "logit"), 
+        data = mvd_hex, method = "REML",
+        select = TRUE)
 
-# remove: -ndmi -pnbi -lcz 
-fit_bin4 <- gam(pres ~ s(ndvi) + s(alan) +
-                  s(dist_coast) +s(protection) +s(pop) +
-                  s(houses) +s(education), 
-                family = binomial, data = mvd_hex)
+m_pndbi <- gam(pres ~ s(pndbi, k = 6) +
+                 s(dist_coast, k = 6) + 
+                 s(protection, k = 6) + 
+                 s(education, k = 6),
+          family = binomial(link = "logit"), 
+          data = mvd_hex, method = "REML",
+          select = TRUE)
 
-summary(fit_bin4)
-
-#remove: -pop -ndmi -pnbi -lcz 
-fit_bin5 <- gam(pres ~ s(ndvi) + s(alan) +
-                  s(dist_coast) +s(protection)+
-                  s(houses) + s(education), 
-                family = binomial, data = mvd_hex)
-
-summary(fit_bin5)
-
-#remove: -houses -pop -ndmi -pnbi -lcz 
-fit_bin6 <- gam(pres ~ s(ndvi) + s(alan) +
-                  s(dist_coast) +s(protection)+
-                  +s(education), 
-                family = binomial, data = mvd_hex)
-
-summary(fit_bin6)
+# test GLM
+glm_ndmi_alan <- glm(pres ~ ndmi + alan + 
+                       dist_coast + protection + 
+                       education + education*education ,
+                   family = binomial(link = "logit"), 
+                   data = mvd_hex)
 ```
 
 #### Model summary results
@@ -627,20 +725,23 @@ summary(fit_bin6)
 #| message: false
 #| code-fold: true
 
-output_bin <- cbind(AIC(fit_bin1, fit_bin2, fit_bin3, fit_bin4, 
-                    fit_bin5, fit_bin6, k=3.18),
-                rsq=c(rsq::rsq(fit_bin1), rsq::rsq(fit_bin2),
-                      rsq::rsq(fit_bin3), rsq::rsq(fit_bin4), 
-                      rsq::rsq(fit_bin5), rsq::rsq(fit_bin6)),
-      formula= as.character(c(formula(fit_bin1), formula(fit_bin2),
-                              formula(fit_bin3), formula(fit_bin4),
-                              formula(fit_bin5), formula(fit_bin6)))) %>% 
+output_bin <- cbind(AIC(m_pndbi, m_ndmi_alan, m_ndmi_hou, 
+                        m_ndmi_pop, m_ndvi_ndmi, m_ndvi_ndmi_hou,
+                        fit_bin_null, k=3.18),
+                rsq=c(rsq::rsq(m_pndbi), rsq::rsq(m_ndmi_alan),
+                      rsq::rsq(m_ndmi_hou), rsq::rsq(m_ndmi_pop), 
+                      rsq::rsq(m_ndvi_ndmi), rsq::rsq(m_ndvi_ndmi_hou),
+                      rsq::rsq(fit_bin_null)),
+      formula= as.character(c(formula(m_pndbi), formula(m_ndmi_alan),
+                              formula(m_ndmi_hou), formula(m_ndmi_pop),
+                              formula(m_ndvi_ndmi), formula(m_ndvi_ndmi_hou),
+                              formula(fit_bin_null)))) %>% 
   arrange(AIC)
 
 output_bin %>% knitr::kable()
 ```
 
-The selected model is `fit_bin6`.  
+The selected model is `m_ndmi_alan`.  
 
 #### Plots
 
@@ -650,8 +751,10 @@ The selected model is `fit_bin6`.
 #| message: false
 #| code-fold: true
 
-gam.check(fit_bin6)
-draw(fit_bin6)
+gratia::draw(m_ndmi_alan) + theme_classic() 
+gam.check(m_ndmi_alan)
+concurvity(m_ndmi_alan)
+# draw(m_ndmi_alan)
 ```
 
 
@@ -663,9 +766,9 @@ draw(fit_bin6)
 #| message: false
 #| code-fold: true
 
-
 # Drop geometry and enforce numeric
-vars <- c("ndvi", "alan", "dist_coast", "protection", "education")
+vars <- c("ndmi", "alan", "dist_coast",
+          "protection", "education")
 df_vars <- mvd_hex %>%
   st_drop_geometry() %>%
   mutate(across(all_of(vars), as.numeric))
@@ -674,7 +777,7 @@ df_vars <- mvd_hex %>%
 # OBSERVATION OCCURRENCE
    
 # 1. Concurvity
-conc <- concurvity(fit_bin6, full = FALSE)
+conc <- concurvity(m_ndmi_alan, full = FALSE)
 conc_est <- as.data.frame(conc$estimate)
 
 conc_df <- conc_est %>%
@@ -723,16 +826,10 @@ ggplot(plot_df, aes(x = term1, y = term2, fill = concurvity)) +
 #| message: false
 
 # keep only grid cells that have N > 0
-mvd_hex_positive <- mvd_hex %>%  filter(N>0)
-
-# data distribution
-fitnb <- fitdist(mvd_hex_positive$N, "nbinom", method = "mle")
-summary(fitnb)
-plot(fitnb)
-
-fitpoi <- fitdist(mvd_hex_positive$N, "pois", method = "mle")
-summary(fitpoi)
-plot(fitpoi)
+mvd_hex_positive <- mvd_hex %>% 
+  st_drop_geometry() %>% filter(N>0) 
+  
+mvd_hex_positive$lcz <- relevel(factor(mvd_hex_positive$lcz), ref = "2")
 ```
 
 ```{r}
@@ -741,49 +838,82 @@ plot(fitpoi)
 #| message: false
 #| code-fold: true
 
-### modeling observation counts
-fit_count1 <- gam(N ~ s(ndvi) + s(ndmi)+ s(pndbi) +
-                    lcz + s(alan) +s(dist_coast) +
-                    s(protection) +s(pop) +
-                    s(houses) + s(education),
-                  data = mvd_hex_positive, family=nb())
+# null model
+m_null<- glmmTMB(N ~ 1,
+                 family = truncated_nbinom2(link = "log"),
+                 data = mvd_hex_positive)
 
-summary(fit_count1)
+m_non_cor <- glmmTMB(N ~ dist_coast + 
+                       protection + education + lcz + I(education^2),
+                     family = truncated_nbinom2(link = "log"),
+                     data = mvd_hex_positive)
 
-### remove: - pndbi
-fit_count2 <- gam(N ~ s(ndvi) + s(ndmi) + 
-                    lcz + s(alan) +s(dist_coast) +
-                    s(protection) +s(pop) +
-                    s(houses) + s(education), 
-                  data = mvd_hex_positive, family=nb())
+m_ndvi <- glmmTMB(N ~ ndvi + 
+                    dist_coast + protection + education + 
+                    lcz + I(education^2),
+                  family = truncated_nbinom2(link = "log"), 
+                  data = mvd_hex_positive)
 
-summary(fit_count2)
+m_ndmi <- glmmTMB(N ~ ndmi + 
+                    dist_coast + protection + education + 
+                    lcz + I(education^2),
+                  family = truncated_nbinom2(link = "log"), 
+                  data = mvd_hex_positive)
 
-### remove: -ndvi -pndbi
-fit_count3 <- gam(N ~ s(ndmi) + lcz + s(alan) +
-                    s(dist_coast) +s(protection) +
-                    s(pop) + s(houses) + s(education), 
-                  data = mvd_hex_positive, family=nb())
+m_pndbi <- glmmTMB(N ~ pndbi + 
+                     dist_coast + protection + education + 
+                     lcz + I(education^2),
+                   family = truncated_nbinom2(link = "log"), 
+                   data = mvd_hex_positive)
 
-summary(fit_count3)
+m_alan <- glmmTMB(N ~ alan + 
+                    dist_coast + protection + education + 
+                    lcz + I(education^2),
+                  family = truncated_nbinom2(link = "log"), 
+                  data = mvd_hex_positive)
 
-###remove:  -pop -ndvi -pndbi
-fit_count4 <-  gam(N ~ s(ndmi) + lcz + s(alan) +
-                     s(dist_coast) +s(protection) +
-                     s(houses) + s(education),
-                   data = mvd_hex_positive, family=nb())
-summary(fit_count4)
+m_pop <- glmmTMB(N ~ pop + 
+                   dist_coast + protection + education + 
+                   lcz + I(education^2),
+                 family = truncated_nbinom2(link = "log"), 
+                 data = mvd_hex_positive)
 
-### -alan -pop -ndvi -pndbi
-fit_count5 <- gam(N ~ s(ndmi) + lcz + +
-                    s(dist_coast) +s(protection) +
-                    s(houses) + s(education), 
-                  data = mvd_hex_positive, family=nb())
+m_houses <- glmmTMB(N ~ houses + 
+                       dist_coast + protection + education + 
+                       lcz + I(education^2),
+                     family = truncated_nbinom2(link = "log"), 
+                     data = mvd_hex_positive)
 
-summary(fit_count5)
+m_ndmi_pop <- glmmTMB(N ~ ndmi + 
+                        pop + dist_coast + protection + education + 
+                        lcz + I(education^2),
+                      family = truncated_nbinom2(link = "log"), 
+                      data = mvd_hex_positive)
 
+m_ndmi_hou <- glmmTMB(N ~ ndmi + 
+                        houses + dist_coast + protection + education + 
+                        lcz + I(education^2),
+                      family = truncated_nbinom2(link = "log"), 
+                      data = mvd_hex_positive)
 
-gam.check(fit_count5)
+m_pndbi_hou <- glmmTMB(N ~ pndbi + 
+                         houses + dist_coast + protection + education + 
+                         lcz + I(education^2),
+                       family = truncated_nbinom2(link = "log"), 
+                       data = mvd_hex_positive)
+
+m_alan_pop <- glmmTMB(N ~ alan + 
+                        pop + dist_coast + protection + education + 
+                        lcz + I(education^2),
+                      family = truncated_nbinom2(link = "log"), 
+                      data = mvd_hex_positive)
+
+m_alan_hou <- glmmTMB(N ~ alan + 
+                        houses + dist_coast + protection + education + 
+                        lcz + I(education^2),
+                      family = truncated_nbinom2(link = "log"), 
+                      data = mvd_hex_positive)
+
 ```
 
 #### Model summary results
@@ -795,20 +925,38 @@ gam.check(fit_count5)
 #| code-fold: true
 
 ### count output summary
-output_count <- cbind(AIC(fit_count1, fit_count2, fit_count3, fit_count4, 
-                    fit_count5, k=3.18),
-                rsq=c(rsq::rsq(fit_count1), rsq::rsq(fit_count2),
-                      rsq::rsq(fit_count3), rsq::rsq(fit_count4), 
-                      rsq::rsq(fit_count5)),
-      formula= as.character(c(formula(fit_count1), formula(fit_count2),
-                              formula(fit_count3), formula(fit_count4),
-                              formula(fit_count5)))) %>% 
+output_count <- cbind(AIC(m_pndbi, m_ndmi, m_ndvi, 
+                          m_pop, m_houses, m_ndmi_pop, 
+                          m_ndmi_hou, m_pndbi_hou, m_alan_pop, 
+                          m_alan_hou, m_null, k=2),
+                      r2=c(r2_mcfadden(m_pndbi)$R2,
+                           r2_mcfadden(m_ndmi)$R2,
+                            r2_mcfadden(m_ndvi)$R2,  
+                            r2_mcfadden(m_pop)$R2, 
+                            r2_mcfadden(m_houses)$R2, 
+                           r2_mcfadden(m_ndmi_pop)$R2,
+                            r2_mcfadden(m_ndmi_hou)$R2, 
+                           r2_mcfadden(m_pndbi_hou)$R2,
+                           r2_mcfadden(m_alan_pop)$R2, 
+                           r2_mcfadden(m_alan_hou)$R2,
+                           r2_mcfadden(m_null)$R2),
+                      formula=as.character(c(formula(m_pndbi), 
+                                             formula(m_ndmi),
+                                             formula(m_ndvi), 
+                                             formula(m_pop),
+                                             formula(m_houses), 
+                                             formula(m_ndmi_pop),
+                                             formula(m_ndmi_hou), 
+                                             formula(m_pndbi_hou),
+                                             formula(m_alan_pop), 
+                                             formula(m_alan_hou),
+                                             formula(m_null)))) %>% 
   arrange(AIC)
 
-output_count %>% knitr::kable()
+output_count  %>% knitr::kable()
 ```
 
-The selected model is `fit_count5`.
+The selected model is `m_ndmi_pop`.
 
 #### Plots
 
@@ -818,116 +966,38 @@ The selected model is `fit_count5`.
 #| message: false
 #| code-fold: true
 
-gam.check(fit_count5)
-draw(fit_count5)
+p_ndmi <- ggpredict(m_ndmi_pop,
+                    terms = "ndmi [all]",
+                    back_transform = FALSE)
+p_pop <- ggpredict(m_ndmi_pop,
+                   terms = "pop [all]",
+                   back_transform = FALSE)
+p_coast <- ggpredict(m_ndmi_pop, 
+                     terms = "dist_coast [all]",
+                     back_transform = FALSE)
+p_protection <- ggpredict(m_ndmi_pop, 
+                          terms = "protection [all]",
+                          back_transform = FALSE)
+p_education <- ggpredict(m_ndmi_pop, 
+                         terms = "education [all]",
+                         back_transform = FALSE)
+p_lcz <- ggpredict(m_ndmi_pop, 
+                   terms = "lcz [all]",
+                   back_transform = FALSE)
 
-# Create a plot for lcz
-vc <- vcov(fit_count5)
 
-# Get all parameter names
-param_names <- colnames(vc)
+plot(p_ndmi) + scale_y_log10() +
+  plot(p_pop) + scale_y_log10() +
+  plot(p_coast) + scale_y_log10() +
+  plot(p_protection) + scale_y_log10() +
+  plot(p_education) + scale_y_log10() +
+  plot(p_lcz) + scale_y_log10() +
+  plot_layout(ncol = 2)
 
-# Identify LCZ-related terms
-lcz_terms <- grep("^lcz", param_names, value = TRUE)
+# Figures for the manuscript were prepared using the effects package
 
-# Extract estimates directly from vcov row names
-estimates <- fit_count5$coefficients[lcz_terms]
+# eff <- allEffects(m_ndmi_pop)
+# plot(eff, lwd=4, rescale.axis = T, asp=1)
 
-# Get standard errors
-ses <- sqrt(diag(vc[lcz_terms, lcz_terms]))
-
-# Assemble dataframe
-plot_df <- data.frame(
-  level = gsub("^lcz", "", lcz_terms),
-  estimate = estimates,
-  se = ses,
-  stringsAsFactors = FALSE
-)
-
-# Add 95% confidence intervals
-plot_df$lower <- plot_df$estimate - 1.96 * plot_df$se
-plot_df$upper <- plot_df$estimate + 1.96 * plot_df$se
-
-# Add reference level manually (effect = 0)
-ref_level <- levels(fit_count5$model$lcz)[1]
-plot_df <- rbind(
-  data.frame(
-    level = ref_level,
-    estimate = 0,
-    se = NA,
-    lower = 0,
-    upper = 0
-  ),
-  plot_df
-)
-
-# Re-order LCZ levels
-plot_df$level <- factor(plot_df$level, levels = sort(as.numeric(unique(plot_df$level))))
-
-# Plot
-ggplot(plot_df, aes(x = level, y = estimate)) +
-  geom_point(size=6) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  labs(
-    x = "LCZ Category",
-    y = "Effect"
-  ) +
-  theme_classic()
 ```
 
-
-#### Concurvity
-
-```{r}
-#| label: concurvity-count
-#| warning: false
-#| message: false
-#| code-fold: true
-
-
-# Drop geometry and enforce numeric
-vars <- c("ndmi", "houses", "dist_coast", "protection", "education")
-df_vars <- mvd_hex %>%
-  st_drop_geometry() %>%
-  mutate(across(all_of(vars), as.numeric))
-  
-# 1. Concurvity
-conc <- concurvity(fit_count5, full = FALSE)
-conc_est <- as.data.frame(conc$estimate)
-
-conc_df <- conc_est %>%
-  mutate(term1 = rownames(.)) %>%
-  pivot_longer(cols = -term1,
-               names_to = "term2",
-               values_to = "concurvity")
-
-# 2. Correlation
-cor_mat <- cor(df_vars[, vars], use = "pairwise.complete.obs")
-
-cor_df <- as.data.frame(cor_mat) %>%
-  mutate(term1 = rownames(.)) %>%
-  pivot_longer(cols = -term1,
-               names_to = "term2",
-               values_to = "correlation")
-
-conc_df$term1<- gsub("^s\\((.*?)\\)$", "\\1", (conc_df$term1))
-conc_df$term2<- gsub("^s\\((.*?)\\)$", "\\1", (conc_df$term2))
-
-# 3. Merge concurvity + correlation
-plot_df <- left_join(conc_df, cor_df, by = c("term1", "term2")) %>% 
-  filter(term1 != 'para' & term2 != 'para')
-
-# 4. Plot
-ggplot(plot_df, aes(x = term1, y = term2, fill = concurvity)) +
-  geom_tile(color = "white") +
-  geom_text(aes(label = round(correlation, 2)), size = 3) +
-  scale_fill_gradient(low = "white", high = "red",
-                      limits = c(0, 1),
-                      name = "Concurvity (0–1)") +
-  coord_equal() +
-  theme_minimal(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Observation count",
-       subtitle = "Heatmap = concurvity; Numbers = correlations",
-       x = "", y = "")
-```

@@ -14,6 +14,7 @@ This repository ([https://github.com/bienflorencia/biases_naturalistauy_montevid
 
   - `observations-536732.csv`: an csv file containing the observations downloaded from iNaturalist.   
   - `montevideo_data.gpkg`: a geopackage file containing 3 layers for the Montevideo department; `grid`: the grid of 1,148 cells of 0.5 km² area, `env` the grid with environmental variables, and `social` the grid with social variables.  
+  - `gadm/gadm41_URY_1_pk.rds`: an RDS file containing the spatial polygon for Uruguay.
   
 ### Variables in the `montevideo_data.gpkg`: 
   
@@ -37,7 +38,3 @@ This repository ([https://github.com/bienflorencia/biases_naturalistauy_montevid
 **Data** are available under the terms of the Creative Commons Attribution 4.0 International licence CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/legalcode.en).   
 
 **Code** is available under the terms of the GPL-3.0 licence (https://www.gnu.org/licenses/gpl-3.0.html). 
-
-## CITATION
-
-> Orlando L., Berazategui M., Grattarola F. (2026) Socio-ecological drivers of urban biodiversity patterns in contributory science data. [Data/Code]
